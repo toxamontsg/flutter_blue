@@ -124,7 +124,9 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
                                    details:nil];
       }
       // TODO: Implement Connect options (#36)
-      [_centralManager connectPeripheral:peripheral options:nil];
+           if( [peripheral state] == CBPeripheralStateDisconnected || [peripheral state] == CBPeripheralStateDisconnecting) {
+        [_centralManager connectPeripheral:peripheral options:nil];
+      }
       result(nil);
     } @catch(FlutterError *e) {
       result(e);
@@ -402,15 +404,43 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
 
 - (void)centralManager:(CBCentralManager *)central didDisconnectPeripheral:(CBPeripheral *)peripheral error:(NSError *)error {
   NSLog(@"didDisconnectPeripheral");
-  // Unregister self as delegate for peripheral, not working #42
-  peripheral.delegate = nil;
+
+  // if user disconnect manually, error code should be 0
+  if( [error code] != 0 ){
+    // unexpected disconnection -> try reconnect
+    @try {
+      NSLog(@"didDisconnectPeripheral:trying reconnect");
+      // TODO: Implement Connect options (#36)
+      [central connectPeripheral:peripheral options:nil];
+    } @catch(FlutterError *e) {
+      NSLog(@"didDisconnectPeripheral:failed reconnect");
+    }
+  }else{
+    NSLog(@"didDisconnectPeripheral:user disconnected");
+    // Unregister self as delegate for peripheral, not working https://github.com/pauldemarco/flutter_blue/issues/42
+    peripheral.delegate = nil;
+  }
 
   // Send connection state
   [_channel invokeMethod:@"DeviceState" arguments:[self toFlutterData:[self toDeviceStateProto:peripheral state:peripheral.state]]];
 }
 
 - (void)centralManager:(CBCentralManager *)central didFailToConnectPeripheral:(CBPeripheral *)peripheral error:(NSError *)error {
-  // TODO:?
+   // TODO:? Just going to try to issue a reconnect
+  // https://developer.apple.com/forums/thread/105652
+  NSLog(@"didFailToConnectPeripheral");
+
+  // unexpected connection failure -> try connect again
+  @try {
+    NSLog(@"didFailToConnectPeripheral:trying connect");
+    // TODO: Implement Connect options (#36)
+    [central connectPeripheral:peripheral options:nil];
+  } @catch(FlutterError *e) {
+    NSLog(@"didFailToConnectPeripheral:failed connect");
+  }
+
+  // Send connection state
+  [_channel invokeMethod:@"DeviceState" arguments:[self toFlutterData:[self toDeviceStateProto:peripheral state:peripheral.state]]];
 }
 
 //
