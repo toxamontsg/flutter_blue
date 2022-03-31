@@ -127,6 +127,9 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
            if( [peripheral state] == CBPeripheralStateDisconnected || [peripheral state] == CBPeripheralStateDisconnecting) {
         [_centralManager connectPeripheral:peripheral options:nil];
       }
+
+      [_channel invokeMethod:@"DeviceState" arguments:[self toFlutterData:[self toDeviceStateProto:peripheral state:peripheral.state]]];
+      
       result(nil);
     } @catch(FlutterError *e) {
       result(e);
