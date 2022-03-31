@@ -99,12 +99,28 @@ class BluetoothCharacteristic {
     });
   }
 
+// Attempt to read a value, gracefully handling
+  // * timeouts
+  // * inconsistent peripheral service discovery
+  Future<List<int>?> tryRead(Duration timeout) async {
+    try {
+      return read()
+          .then((d) => Future<List<int>?>.value(d))
+          .timeout(timeout, onTimeout: () => null);
+    } on PlatformException catch (e) {
+      if (e.code == "locateCharacteristic") {
+        debugPrint('Silencing $e');
+        return Future.value(null);
+      }
+    }
+  }
+
   /// Writes the value of a characteristic.
   /// [CharacteristicWriteType.withoutResponse]: the write is not
   /// guaranteed and will return immediately with success.
   /// [CharacteristicWriteType.withResponse]: the method will return after the
   /// write operation has either passed or failed.
-  Future<Null> write(List<int> value, {bool withoutResponse = false}) async {
+  Future<bool> write(List<int> value, {bool withoutResponse = false}) async {
     final type = withoutResponse
         ? CharacteristicWriteType.withoutResponse
         : CharacteristicWriteType.withResponse;
@@ -137,8 +153,25 @@ class BluetoothCharacteristic {
         .then((w) => w.success)
         .then((success) => (!success)
             ? throw new Exception('Failed to write the characteristic')
-            : null)
-        .then((_) => null);
+            : true)
+        .then((_) => true);
+  }
+
+  // Attempt to write a value, gracefully handling
+  // * timeouts
+  // * inconsistent peripheral service discovery
+  Future<bool?> tryWrite(List<int> value, Duration timeout,
+      {bool withoutResponse = false}) async {
+    try {
+      return write(value, withoutResponse: withoutResponse)
+          .then((b) => Future<bool?>.value(b))
+          .timeout(timeout, onTimeout: () => null);
+    } on PlatformException catch (e) {
+      if (e.code == "locateCharacteristic") {
+        debugPrint('Silencing $e');
+        return Future.value(null);
+      }
+    }
   }
 
   /// Sets notifications or indications for the value of a specified characteristic
